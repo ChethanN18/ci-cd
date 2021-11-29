@@ -1,0 +1,42 @@
+pipeline{
+    agent any
+    stages{
+        stage("SCM checkout"){
+            steps{
+                git credentialsId: 'ChethanN18', url: 'https://github.com/ChethanN18/my-app'
+            }
+        }
+        
+         stage("maven build"){
+            steps{
+                sh 'mvn clean package'
+            }
+        }
+        
+        stage("Building docker image"){
+            steps{
+                    sh 'docker build -t chethann/my-app:2.0.0 .'
+            }
+        }
+        
+        stage("pushing to dockerhub"){
+            steps{
+                withCredentials([string(credentialsId: 'docker-pass', variable: 'dockerhubp')]) {
+                    sh "docker login -u chethann -p ${dockerhubp}"
+                }
+                    sh 'docker push chethann/my-app:2.0.0'
+            }
+        }
+        
+        stage("run container in dev server"){
+            steps{
+                script{
+                 def dockerRun = "docker run -d -p 8080:8080 --name my-app chethann/my-app:2.0.0"
+                    sshagent(['docker-cont']) {
+                        sh "ssh -o StrictHostKeyChecking=no ec2-user@172.31.46.35 ${dockerRun}"
+                    }
+                }
+            }
+        }
+    }
+}
